@@ -6,6 +6,18 @@ from shutil import copytree
 import os
 import subprocess
 
+from get_input_profiles_extra import get_dlnnedr,get_dlntedr,get_dlnnidr,get_dlntidr, get_ni_new, get_dlnnidr_new, get_rhos
+from get_input_profiles import get_r, get_psi, get_Ti, get_ni, get_Te, get_ne, get_IPCCW
+from diff_matrix import diff_matrix
+
+from cgyro_out_info import Cgyro_out_info
+
+from EXPRO_2_perfect_geometry import EXPRO_geometry
+
+import matplotlib.pyplot as plt
+
+elecharge = 1.60217662e-19
+
 def read_output1(filename,col):
     """Reads a column 'col' of a certain type of CGYRO output used for:
     out.cgyro.time
@@ -15,9 +27,12 @@ def read_output1(filename,col):
     """
 
     ret = []
-    with open(filename,'r') as f:
-        for l in f.readlines():
-            ret.append(float(l.split()[col]))
+    try:
+        with open(filename,'r') as f:
+            for l in f.readlines():
+                ret.append(float(l.split()[col]))
+    except IOError:
+        print "File '" + filename + "' does not exists for '" + self.dirname + "'!"
     return np.array(ret)
 
 
@@ -38,11 +53,11 @@ class Cgyro_simul(object):
         os.chdir(self.dirname)
         platform = os.environ['GACODE_PLATFORM']
         if platform == 'KEBNEKAISE':
-            pass
+            runstr= "gacode_qsub -code cgyro -n" + str(n) + " -nomp 2 -numa 2 -s -e"
         else:
             runstr= "cgyro -n " + str(n) + " -e ."
-            print ">" + runstr
-            subprocess.call(runstr, shell=True)
+        print ">" + runstr
+        subprocess.call(runstr, shell=True)
         os.chdir(this_dir)
 
         
@@ -119,6 +134,10 @@ class Cgyro_simul(object):
     def RMIN(self):
         return self.input.RMIN
 
+    @property
+    def r(self):
+        return self.RMIN * self.a
+
     
     @property
     def N_RADIAL(self):
@@ -136,11 +155,219 @@ class Cgyro_simul(object):
     def __init__(self,dirname):
         self.dirname = dirname
         self.input = Cgyro_input(self.fn("input.cgyro"))
+        self.has_read_out_info = False
+        self.has_read_geometry = False
 
-    def fn(self,fn):
-        """Turns a filename into a filename in the right dir"""
-        return self.dirname + "/" + fn
+    
+    def read_out_info(self):
+        self.out_info = Cgyro_out_info(self.fn("out.cgyro.info"))
+        self.has_read_out_info = True
         
+    def read_geometry(self):
+        # this is seperated from __init__ since it is rather slow
+        # and only used for a few quantities at the moment
+        # it is called automatically when it is needed for the first time
+        self.expro_geometry = EXPRO_geometry(self.dirname)
+        self.has_read_geometry = True
+        
+    def fn(self,fn):
+        """Turns a filename into a filename in the right dir"""            
+        return self.dirname + "/" + fn
+
+    @property
+    def a_Ln(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.a_Ln
+        
+    @property
+    def a_LT(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.a_Lt
+
+    @property
+    def r_profile(self):
+        return get_r(self.fn("input.profiles"))
+
+    @property
+    def psi_profile(self):
+        return get_psi(self.fn("input.profiles"))
+
+    
+    @property
+    def dpsidr_profile(self):
+        psi = self.psi_profile
+        r = self.r_profile
+        #D=diff_matrix(r[1],r[-2],len(r)-2,order=4)
+        #dpsidr = np.dot(D,psi[1:-1])
+        #return np.concatenate(([dpsidr[0]],dpsidr,[dpsidr[-1]]))
+        drdpsi = np.diff(psi[1:])/np.diff(r[1:])
+        return np.concatenate(([drdpsi[0],drdpsi[0]],drdpsi))
+        
+        
+    
+    @property
+    def T_profile(self):
+        T = []
+        for i in range(1,self.Nspecies):
+            T.append(get_Ti(self.fn("input.profiles"),i))
+        T.append(get_Te(self.fn("input.profiles")))
+        return np.array(T).transpose()
+
+    @property
+    def Te_profile(self):
+        return self.T_profile[:,self.electron_index]
+
+    @property
+    def n_profile(self):
+        n = []
+        for i in range(1,self.Nspecies):
+            n.append(get_ni(self.fn("input.profiles"),i))
+        n.append(get_ne(self.fn("input.profiles")))
+        return np.array(n).transpose()
+
+    @property
+    def IPCCW(self):
+        return get_IPCCW(self.fn("input.profiles"))
+    
+    @property
+    def RBp_profile(self):
+        if self.has_read_geometry == False:
+            self.read_geometry()
+        
+        RBp2= (self.expro_geometry.R*self.expro_geometry.B)**2-self.expro_geometry.I[:,np.newaxis]**2
+        # the sign of Bp is given by -IPCCW
+        # see: http://gafusion.github.io/doc/geometry.html
+        Ntheta = RBp2.shape[1]
+        #plt.plot(np.sqrt(RBp2)[50])
+        #plt.show()
+        return -self.IPCCW * np.sqrt(RBp2)[:,Ntheta//2+1]
+
+    @property
+    def dlnndr_profile(self):
+        dlnndr = []
+        dlnndr.append(get_dlnnidr_new(self.fn("input.profiles.extra")))
+        for i in range(1,self.Nspecies-1):
+            dlnndr.append(get_dlnnidr(self.fn("input.profiles.extra"))[i])
+        dlnndr.append(get_dlnnedr(self.fn("input.profiles.extra")))
+        # minus sign since dlnnidr from input.profiles.extra in fact is -dln(n)/dr
+        return -np.array(dlnndr).transpose()
+
+    @property
+    def dlnTdr_profile(self):
+        dlnTdr = []
+        for i in range(0,self.Nspecies-1):
+            dlnTdr.append(get_dlntidr(self.fn("input.profiles.extra"))[i])
+        dlnTdr.append(get_dlntedr(self.fn("input.profiles.extra")))
+        # minus sign since dlnnidr from input.profiles.extra in fact is -dln(T)/dr
+        return -np.array(dlnTdr).transpose()
+
+    @property
+    def a_Ln_profile(self):
+        return -self.a*self.dlnndr_profile
+    
+    @property
+    def a_LT_profile(self):
+        return -self.a*self.dlnTdr_profile
+
+    @property
+    def Er_estimate_profile(self):
+        # E_r ~ T_i \nabla ln p_i/e
+        i=0 #assumes bulk ions are the first species
+        return self.T_profile[:,i] * (self.dlnTdr_profile[:,i] + self.dlnndr_profile[:,i])/(self.Z[i] * elecharge)
+    
+    @property
+    def omega0_estimate_profile(self):
+        return self.Er_estimate_profile/(self.dpsidr_profile)
+
+
+    @property
+    def gamma_E_profile(self):
+        r = self.r_profile
+        # exclude first and last grid point, since those are potentially artificial
+        D=diff_matrix(r[1],r[-2],len(r)-2,order=4)
+        omega0 = self.omega0_estimate_profile[1:-1]
+        ddr_omega0 = np.dot(D,omega0)
+        ddr_omega0 = np.concatenate(([ddr_omega0[0]],ddr_omega0,[ddr_omega0[-1]]))
+        return -r*ddr_omega0/(self.q)
+    
+    @property
+    def gamma_E(self):
+        return  np.interp(self.r,self.r_profile,self.gamma_E_profile)
+
+    @property
+    def gamma_E_norm_profile(self):
+        return self.gamma_E_profile*self.a/self.c_s_profile
+
+    @property
+    def gamma_E_norm(self):
+        return self.gamma_E*self.a/self.c_s
+                
+    @property
+    def T(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.T * self.out_info.T_norm *1e3 * elecharge
+
+    @property
+    def n(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.n * self.out_info.n_norm * 1e19
+
+    @property
+    def electron_index(self):
+        return np.argwhere(self.Z==-1)[0][0]
+    
+    @property
+    def ne(self):
+        return self.n[self.electron_index]
+
+    @property
+    def Te(self):
+        return self.T[self.electron_index]
+
+    @property
+    def Z(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.z
+
+    @property
+    def Nspecies(self):
+        return len(self.Z)
+    
+    @property
+    def a(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.a
+
+    @property
+    def c_s(self):
+        u=1.660539040e-27
+        mD=2.013553212745*u
+        return np.sqrt(self.Te/mD)
+
+    @property
+    def c_s_profile(self):
+        u=1.660539040e-27
+        mD=2.013553212745*u
+        return np.sqrt(self.Te_profile/mD)
+
+    @property
+    def q(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.q
+
+    @property
+    def Er_estimate(self):
+        # E_r ~ T_i \nabla ln p_i/e
+        i = 0
+        self.T[i] * (a_LT[i] + a_Ln[i])/(self.a * self.Z[i] * elecharge)
+    
 if __name__=="__main__":
     import matplotlib.pyplot as plt
     cs1= Cgyro_simul('../AUG/30701/r_0.9_K_Y_0.2/N1')

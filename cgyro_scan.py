@@ -1,5 +1,4 @@
 from cgyro_simul import Cgyro_simul
-from cgyro_collection import Cgyro_collection_from_subdirs
 
 import os
 
@@ -29,6 +28,13 @@ class Cgyro_scan(object):
         for simul in self.modified_simuls:
             print "Running in directory: " + simul.dirname
             simul.run(n)
+
+    def generate_tgyro_file(self,n=4,filename="input.tgyro"):
+        with open(filename,'w') as f:
+            for simul in self.modified_simuls:
+                f.write("DIR " + simul.dirname + " " + str(n) + "\n")
+            f.write("\n")
+            f.write("TGYRO_MODE=3")
 
 if __name__=="__main__":
     scan_basedir = "test_scan"

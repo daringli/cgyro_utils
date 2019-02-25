@@ -13,12 +13,16 @@ class Cgyro_collection(object):
     def __setattr__(self, attr, value):
         for s in object.__getattribute__(self,"simuls"):
             setattr(s,attr,value)
+
+    def __len__(self):
+        return len(object.__getattribute__(self,"simuls"))
     
     def __init__(self,dirlist):
         object.__setattr__(self,"dirlist",dirlist)
         object.__setattr__(self,"simuls",[])
         for d in dirlist:
             object.__getattribute__(self,"simuls").append(Cgyro_simul(d))
+
 
 def Cgyro_collection_from_subdirs(superdir):
     subdirs = next(os.walk(superdir))[1]
