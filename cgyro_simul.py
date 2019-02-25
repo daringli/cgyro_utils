@@ -18,25 +18,25 @@ import matplotlib.pyplot as plt
 
 elecharge = 1.60217662e-19
 
-def read_output1(filename,col):
-    """Reads a column 'col' of a certain type of CGYRO output used for:
-    out.cgyro.time
-    out.cgyro.freq
-    ...
-    Where col is the 0-indexed column
-    """
-
-    ret = []
-    try:
-        with open(filename,'r') as f:
-            for l in f.readlines():
-                ret.append(float(l.split()[col]))
-    except IOError:
-        print "File '" + filename + "' does not exists for '" + self.dirname + "'!"
-    return np.array(ret)
 
 
 class Cgyro_simul(object):
+
+    def read_output1(self,filename,col):
+        """Reads a column 'col' of a certain type of CGYRO output used for:
+        out.cgyro.time
+        out.cgyro.freq
+        ...
+        Where col is the 0-indexed column"""
+
+        ret = []
+        try:
+            with open(filename,'r') as f:
+                for l in f.readlines():
+                    ret.append(float(l.split()[col]))
+        except IOError:
+            print "File '" + filename + "' does not exists for '" + self.dirname + "'!"
+        return np.array(ret)
 
     def copy(self,destination):
         copytree(self.dirname,destination)
@@ -64,7 +64,7 @@ class Cgyro_simul(object):
     @property
     def t(self):
         time_filename = "out.cgyro.time"
-        return read_output1(self.fn(time_filename),col=0)
+        return self.read_output1(self.fn(time_filename),col=0)
 
     @property
     def converged(self):
@@ -98,12 +98,12 @@ class Cgyro_simul(object):
     @property
     def omega(self):
         freq_filename = "out.cgyro.freq"
-        return read_output1(self.fn(freq_filename),col=0)
+        return self.read_output1(self.fn(freq_filename),col=0)
 
     @property
     def gamma(self):
         freq_filename = "out.cgyro.freq"
-        return read_output1(self.fn(freq_filename),col=1)
+        return self.read_output1(self.fn(freq_filename),col=1)
 
     def avg_omega(self,i=100):
         return np.average(self.omega[i:])
