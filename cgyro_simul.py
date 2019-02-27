@@ -17,7 +17,10 @@ from EXPRO_2_perfect_geometry import EXPRO_geometry
 import matplotlib.pyplot as plt
 
 elecharge = 1.60217662e-19
-
+pi = np.pi
+eps0 = 8.854187817e-12
+u=1.660539040e-27
+mD=2.013553212745*u # deuterium mass
 
 
 class Cgyro_simul(object):
@@ -171,9 +174,13 @@ class Cgyro_simul(object):
         self.has_read_geometry = True
         
     def fn(self,fn):
-        """Turns a filename into a filename in the right dir"""            
-        return self.dirname + "/" + fn
-
+        """Turns a filename into a filename in the right dir"""
+        try:
+            ret = self.dirname + "/" + fn
+        except TypeError as e:
+            raise TypeError(str(e) + "dirname : " +str(self.dirname))
+        return ret
+    
     @property
     def a_Ln(self):
         if not self.has_read_out_info:
@@ -281,7 +288,6 @@ class Cgyro_simul(object):
     def omega0_estimate_profile(self):
         return self.Er_estimate_profile/(self.dpsidr_profile)
 
-
     @property
     def gamma_E_profile(self):
         r = self.r_profile
@@ -335,6 +341,37 @@ class Cgyro_simul(object):
         return self.out_info.z
 
     @property
+    def m(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        # placeholder for actual mnorm
+        # this will be correct for PROFILE_MODE=2
+        mnorm = mD
+        return self.out_info.m * mnorm
+
+    @property
+    def me(self):
+        return self.m[self.electron_index]
+
+    @property
+    def nu_norm(self):
+        nu_normed = 0 #nu/(c_s/a)
+        # nu defined as \sum_{b} 1/tau_{ab} with tau_{ab} in Appendix of Helander+Sigmar
+        # i.e. nu_ab = 4/(3sqrt(pi)) \hat{nu}_ab
+
+        for b in range(self.Nspecies):
+            nu_normed = nu_normed + self.Z[b]**2 * self.n[b]
+        nu_normed = (self.Z**2/(self.T**(3/2)*(self.m)**(1/2))) * (3* self.a *np.sqrt(mD) *elecharge**4*self.logLambda/(np.sqrt(self.Te *2 *pi) *2*eps0**2)) * nu_normed
+        return nu_normed
+
+    @property
+    def nuee_norm(self):
+        # defined as in the CGYRO manual
+        # but in SI units e_G^4 = e_SI^4/(4*pi eps0)**2
+        nu = self.ne*elecharge**4*self.logLambda/((2*self.Te)**(3/2) * 4 * pi * eps0**2 * np.sqrt(self.me))
+        return nu/(self.c_s/self.a)
+        
+    @property
     def Nspecies(self):
         return len(self.Z)
     
@@ -346,14 +383,10 @@ class Cgyro_simul(object):
 
     @property
     def c_s(self):
-        u=1.660539040e-27
-        mD=2.013553212745*u
         return np.sqrt(self.Te/mD)
 
     @property
     def c_s_profile(self):
-        u=1.660539040e-27
-        mD=2.013553212745*u
         return np.sqrt(self.Te_profile/mD)
 
     @property
@@ -363,10 +396,85 @@ class Cgyro_simul(object):
         return self.out_info.q
 
     @property
+    def s_q(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.s
+
+    @property
+    def R(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.R_a*self.a
+
+    @property
+    def shift(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.shift
+
+    @property
+    def kappa(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.kappa
+
+    @property
+    def s_kappa(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.s_kappa
+
+    @property
+    def delta(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.delta
+
+    @property
+    def s_delta(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.s_delta
+
+    @property
+    def zeta(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.zeta
+
+    @property
+    def s_zeta(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.s_zeta
+
+    @property
+    def zmag(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.zmag
+
+    @property
+    def dzmag(self):
+        if not self.has_read_out_info:
+            self.read_out_info()
+        return self.out_info.dzmag
+    
+
+    @property
     def Er_estimate(self):
         # E_r ~ T_i \nabla ln p_i/e
         i = 0
         self.T[i] * (a_LT[i] + a_Ln[i])/(self.a * self.Z[i] * elecharge)
+
+    @property
+    def logLambda(self):
+        # from EXPRO_compute_derived.f90
+        #loglam(:) = 24.0 - log(sqrt(EXPRO_ne(:)*1e13)/(EXPRO_te(:)*1e3))
+        # which is the second electron-ion formula in NRL
+        loglam = 24.0 - np.log(np.sqrt(self.ne/1e6)/(self.Te/elecharge))
+        return loglam
     
 if __name__=="__main__":
     import matplotlib.pyplot as plt

@@ -32,25 +32,26 @@ class Cgyro_input(object):
             line = line.split('#',1)[0]
             line = line.strip()
             return line
-        
-        object.__setattr__(self, "input_file", open(self.input_filename,'r'))
+
         object.__setattr__(self, "file_attributes", [])
-        for line in self.input_file.readlines():
-            line=trim_line(line)
-            if len(line)>0:
-                try:
-                    attr,value = line.split('=',1)
-                except ValueError:
-                    raise ValueError("Line is not on form: X=Y, line='" + line + "'")
-                #TODO cast attr to upper or lower if input.cgyro is not case sensitive
-                attr = attr.strip()
-                try:
-                    value =  float(value.strip())
-                except ValueError:
-                    raise ValueError("Attribute +'" +attr+"' has value that could not be cast to float. Value: '" + value + "'")
-                object.__setattr__(self,attr,value)
-                self.file_attributes.append((attr))
-                
+        
+        with open(self.input_filename,'r') as input_file:
+            for line in input_file.readlines():
+                line=trim_line(line)
+                if len(line)>0:
+                    try:
+                        attr,value = line.split('=',1)
+                    except ValueError:
+                        raise ValueError("Line is not on form: X=Y, line='" + line + "'")
+                    #TODO cast attr to upper or lower if input.cgyro is not case sensitive
+                    attr = attr.strip()
+                    try:
+                        value =  float(value.strip())
+                    except ValueError:
+                        raise ValueError("Attribute +'" +attr+"' has value that could not be cast to float. Value: '" + value + "'")
+                    object.__setattr__(self,attr,value)
+                    self.file_attributes.append((attr))
+
     def __init__(self,input_filename):
         # use object's setattr since we override our own
         object.__setattr__(self, "file_attributes", [])

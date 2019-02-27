@@ -20,11 +20,19 @@ class Input_profiles(object):
             # first pass, we read comment lines for meta data
             for l in f.readlines():
                 if l.find(findstring1) != -1:
-                    N1 = int(l[1:].strip().split()[3])
-                    f1= True
+                    try:
+                        N1 = int(l[1:].strip().split()[3])
+                    except ValueError:
+                        pass
+                    else:
+                        f1= True
                 elif l.find(findstring2) != -1:
-                    N2 = int(l[1:].strip().split('=')[1])
-                    f2 = True
+                    try:
+                        N2 = int(l[1:].strip().split('=')[1])
+                    except ValueError:
+                        pass
+                    else:
+                        f2 = True
                 elif  l.find(findstring3) != -1:
                     IPCCW = int(l[1:].strip().split()[2])
                 elif  l.find(findstring4) != -1:

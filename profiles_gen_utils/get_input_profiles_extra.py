@@ -16,8 +16,12 @@ class Input_profiles_extra(object):
         return metadata
 
     def get_Nentries(self):
-        return int(self.metadata[-1].split()[-1])
-
+        try:
+            Nentries= int(self.metadata[-1].split()[-1])
+        except ValueError as e:
+            raise ValueError(str(e) + ": " + self.filename)
+        return Nentries
+        
     @staticmethod
     def get_index_range(intervalstring):
         l=intervalstring.split('-')

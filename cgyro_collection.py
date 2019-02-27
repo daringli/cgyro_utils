@@ -16,7 +16,11 @@ class Cgyro_collection(object):
 
     def __len__(self):
         return len(object.__getattribute__(self,"simuls"))
-    
+
+    def __add__(self, other):
+        dirlist = object.__getattribute__(self,"dirlist").append(Cgyro_simul(d)) + object.__getattribute__(other,"dirlist").append(Cgyro_simul(d))
+        return Cgyro_collection(dirlist)
+        
     def __init__(self,dirlist):
         object.__setattr__(self,"dirlist",dirlist)
         object.__setattr__(self,"simuls",[])

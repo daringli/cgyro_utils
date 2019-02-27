@@ -74,7 +74,16 @@ class Cgyro_out_info(object):
                 self.s_a_Lt.append(s_a_Lt)
                 next_parser = read_default
             elif ls[0] == "a[m]:":
-                self.a,self.b_unit,self.rhos_a = [float(x) for x in ls[1:6:2]]
+                keys = ls[0::2]
+                for i,key in enumerate(keys):
+                    if key=="a[m]:":
+                        self.a = float(ls[1+2*i])
+                    elif key=="b_unit[T]:":
+                        self.b_unit = float(ls[1+2*i])
+                    elif key=="rhos/a:":
+                        self.rhos_a = float(ls[1+2*i])
+                    else:
+                        raise ValueError("Unrecognized key: " + key)
                 next_parser = read_default
             elif ls[0] == "n_norm[e19/m^3]:":
                 self.n_norm,self.v_norm,self.T_norm = [float(x) for x in ls[1:6:2]]

@@ -8,8 +8,11 @@ class Cgyro_scan(object):
         self.location = location
         self.basesimul = Cgyro_simul(self.basedir)
         self.modified_simuls = []
-        os.mkdir(self.location)
-
+        try:
+            os.mkdir(self.location)
+        except OSError:
+            pass
+            
     def create_modified(self,name,delta_dict):
         modified_simul = self.basesimul.copy(self.location +"/" + name)
         modified_simul.clean()
